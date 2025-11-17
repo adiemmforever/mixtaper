@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Tracklist – Stage + Mixes (thumbs + titles)</title>
+<style>
+  * { padding:0; margin:0; box-sizing:border-box; font-family:"HelveticaNeue-Light"; }
+
+  .listcontainer { margin:20px; border:1px solid black; height: 212px; overflow: scroll; }
+  .divider { height:25px; border:1px solid black; background:blue; }
+  .navi-head { border:1px solid black; padding:8px; font-size:28px; }
+  .navi { border:1px solid red; }
+  .nav-button { font-size:1.2rem; background:lightblue; padding:15px; }
+  details { list-style:none; border:1px solid black; }
+  details > summary { list-style:none; cursor:pointer; }
+  details > summary::-webkit-details-marker { display:none; }
+
+  /* form (tracks) */
+  .formcontainer {max-width:100%; display:flex; justify-content:space-evenly; margin-top: 20px; margin-bottom: 20px; }
+  form { display:flex; align-items:center; flex-wrap:wrap; gap:1rem; border:1px solid black; width:100%; }
+  .artistname { font-size:18px; color:red; }
+  .textfield { padding:.5rem; font-size:18px; flex:1 1 50px; }
+  .submit { font-size:15px; font-weight:bold; color:#fff; background:#000; border-radius:10px; border:none; padding:.5rem 1rem .7rem; flex:0 0 auto; }
+  input[type=submit]:hover { background:lightgray; }
+
+  /* tracklist */
+  ol.tracklist { display:flex; flex-direction:column; list-style:none; padding:5px; }
+  ol li { border-bottom:1px solid black; display:block;}
+  .number { display:inline-block; min-width:2ch; }
+  .artist { font-size:21px; display:inline-block; margin-top: 5px; }
+  .title { display:block; margin-left:32px; }
+  .meta { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+  .row-select { margin-right:8px; vertical-align:middle;}
+  .delete-btn { margin:12px; }
+
+  /* stage & panels */
+  #stage { min-height:320px; }
+  .panel[hidden] { display:none !important;
+  }
+
+  /* generic content */
+  .pad { padding:16px; }
+  .clock { padding:16px; font-size:77px; text-align:center; }
+  .muted { opacity:.7; font-size:.9rem; }
+
+  /* mixes UI (in blue nav area) */
+  #mixes .mix-nav-wrap { border-top:1px solid #000; padding:12px; background:#e3f3ff; }
+  .mix-form { display:flex; gap:8px; margin:8px 0 12px; }
+  .mix-form input[type=url] { flex:1 1 auto; padding:.5rem; font-size:16px; }
+  .mix-list { display:flex; flex-direction:column; gap:10px; border:1px solid #000; background:#fff; padding:10px; max-height:300px; overflow:auto; }
+  .mix-card { display:grid; grid-template-columns: 88px 1fr auto; gap:10px; align-items:center; border:1px solid #ddd; padding:8px; border-radius:6px; }
+  .mix-thumb { width:88px; height:58px; object-fit:cover; background:#f2f2f2; border:1px solid #ccc; }
+  .mix-title { font-weight:600; line-height:1.2; }
+  .mix-sub { font-size:.8rem; opacity:.7; }
+  .mix-actions { display:flex; gap:6px; }
+  .mix-actions button { font-size:.8rem; padding:.3rem .6rem; }
+  .mix-card.active { outline:2px solid #6bb6ff; background:#eef7ff; }
+
+  @media (max-width:605px){
+    .artistname,.textfield { flex:1 1 600px; }
+  }
+</style>
+</head>
+<body>
+  <div class="whole">
+
+    <!-- STAGE -->
+    <div class="listcontainer" id="stage">
+      <!-- VIEW: CLOCK (default) -->
+      <div id="view-clock" class="panel">
+        <div class="clock">12:15</div>
+      </div>
+
+      <!-- VIEW: LIST (tracklist) -->
+      <div id="view-list" class="panel" hidden>
+        <ol class="tracklist" id="list"></ol>
+        <button id="delete-selected" class="delete-btn">Delete Selected</button>
+      </div>
+
+      <!-- VIEW: MSGS -->
+      <div id="view-msgs" class="panel" hidden>
+        <div class="pad">
+          <h2 style="margin-bottom:.5rem;">Messages</h2>
+          <p class="muted">Put notes, announcements, anything text-y here.</p>
+        </div>
+      </div>
+
+      <!-- VIEW: MIXES (player only; controls live in the nav) -->
+      <div id="view-mixes" class="panel" hidden>
+        <div class="pad">
+          <h2 style="margin-bottom:.5rem;">Player</h2>
+          <div id="mix-player" style="border:1px solid #000; aspect-ratio:16/9; background:#f6f6f6; display:flex; align-items:center; justify-content:center;">
+            <span class="muted">No mix loaded yet</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDE NAV -->
+    <section>
+      <div class="divider"></div>
+      <div class="navi-head">Navi-Menu</div>
+      <div class="navi">
+        <!-- FORM -->
+        <details class="nav-button" id="form">
+          <summary>Form</summary>
+          <div class="formcontainer">
+            <form action="">
+              <label for="artist" class="artistname">Artist</label>
+              <input type="text" id="artist" name="artistname" placeholder="enter artist name.." class="textfield" />
+              <label for="title" class="titletrack">Track</label>
+              <input type="text" id="title" name="titletrack" placeholder="enter track name.." class="textfield" />
+              <input type="submit" value="Submit" class="submit" />
+            </form>
+          </div>
+        </details>
+
+        <!-- MSGS -->
+        <details class="nav-button" id="msgs">
+          <summary>msgs</summary>
+        </details>
+
+        <!-- MIXES (form + saved list live HERE) -->
+        <details class="nav-button" id="mixes">
+          <summary>mixes</summary>
+          <div class="mix-nav-wrap">
+            <form id="mix-add-form" class="mix-form" autocomplete="off">
+              <input type="url" id="mix-url" placeholder="Paste YouTube, SoundCloud, or .mp3/.ogg/.wav link" required />
+              <input type="submit" value="Add Mix" class="submit">
+            </form>
+            <div id="mix-list" class="mix-list">
+              <div class="muted">Nothing here yet—add a link above.</div>
+            </div>
+            <p class="muted" style="margin-top:6px;">Click a saved mix to play it in the stage.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <script>
+      /* ===== CLOCK ===== */
+      function updateClock(){
+        const el = document.querySelector('#view-clock .clock');
+        if (!el) return;
+        const now = new Date();
+        let h = now.getHours();
+        const m = now.getMinutes().toString().padStart(2,'0');
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12; if (h === 0) h = 12;
+        el.textContent = `${h}:${m} ${ampm}`;
+      }
+      updateClock();
+      setInterval(updateClock, 1000 * 15);
+
+      // ======================
+      // TRACKLIST: storage + UI
+      // ======================
+      (function(){
+        const STORAGE_KEY = 'tracklist.v1';
+        const $list = document.getElementById('list');
+        const $form = document.querySelector('#form form');
+        const $artist = document.getElementById('artist');
+        const $title = document.getElementById('title');
+        const $deleteBtn = document.getElementById('delete-selected');
+
+        function uid(){ return 't_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+        function load(){ try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+        function save(tracks){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks)); }
+
+        function migrateFromDOMIfNeeded(){
+          const existing = load();
+          if (existing && Array.isArray(existing)) return existing;
+          const lis = Array.from($list.querySelectorAll('li'));
+          const seed = lis.map(li => {
+            const artist = (li.querySelector('.artist')?.textContent || '').trim();
+            const title  = (li.querySelector('.title')?.textContent  || '').trim();
+            const meta   = (li.querySelector('.meta')?.textContent   || '').trim();
+            return { id: uid(), artist, title, meta, addedAt: Date.now() };
+          });
+          save(seed);
+          return seed;
+        }
+
+        function pad2(n){ return String(n).padStart(2,'0'); }
+        function render(tracks){
+          $list.innerHTML = '';
+          tracks.forEach((t, i) => {
+            const li = document.createElement('li');
+            li.dataset.id = t.id;
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'row-select';
+
+            const num = document.createElement('span');
+            num.className = 'number';
+            num.textContent = pad2(i + 1);
+
+            const artist = document.createElement('span');
+            artist.className = 'artist';
+            // artist.style.marginLeft = '10px';
+            artist.textContent = t.artist;
+
+            const title = document.createElement('span');
+            title.className = 'title';
+            // title.style.marginLeft = '10px';
+            title.textContent = t.title;
+
+            const meta = document.createElement('span');
+            meta.className = 'meta';
+            meta.textContent = t.meta || new Date(t.addedAt).toLocaleString();
+
+            li.append(cb, artist, title, meta);
+            $list.appendChild(li);
+          });
+        }
+
+        function addTrack(artist, title){
+          const a = (artist || '').trim();
+          const t = (title  || '').trim();
+          if (!a || !t) return;
+          const tracks = load() || [];
+          tracks.push({ id: uid(), artist: a, title: t, meta: '', addedAt: Date.now() });
+          save(tracks);
+          render(tracks);
+          show('list');
+          const $formDetails = document.getElementById('form');
+          if ($formDetails && !$formDetails.open) $formDetails.open = true;
+        }
+
+        function deleteSelected(){
+          const tracks = load() || [];
+          const checkedIds = Array.from($list.querySelectorAll('input.row-select:checked'))
+            .map(cb => cb.closest('li')?.dataset.id)
+            .filter(Boolean);
+          if (!checkedIds.length) return;
+          const remaining = tracks.filter(t => !checkedIds.includes(t.id));
+          save(remaining);
+          render(remaining);
+
+          const anyOpen = ['form','msgs','mixes'].some(id => document.getElementById(id)?.open);
+          if (remaining.length === 0 && !anyOpen) show('clock');
+        }
+
+        $form?.addEventListener('submit', (e) => {
+          e.preventDefault();
+          addTrack($artist.value, $title.value);
+          $artist.value = '';
+          $title.value = '';
+          $artist.focus();
+        });
+        $deleteBtn?.addEventListener('click', deleteSelected);
+
+        [$artist, $title].forEach(input => {
+          input?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              $form?.requestSubmit();
+            }
+          });
+        });
+
+        const initial = migrateFromDOMIfNeeded();
+        render(initial || []);
+      })();
+
+      // ======================
+      // MIXES (Player in stage; Add/List in nav) with thumbnails + titles
+      // ======================
+      (function(){
+        const STORAGE_KEY = 'mixes.v1';
+        const $player = document.getElementById('mix-player');
+        const $list = document.getElementById('mix-list');
+        const $form = document.getElementById('mix-add-form');
+        const $url = document.getElementById('mix-url');
+
+        function uid(){ return 'm_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+        function load(){ try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } }
+        function save(mixes){ localStorage.setItem(STORAGE_KEY, JSON.stringify(mixes)); }
+
+        // ---- URL → embed model ----
+        function getYouTubeId(u){
+          try {
+            const url = new URL(u);
+            if (url.hostname.includes('youtu.be')) return url.pathname.slice(1);
+            if (url.searchParams.get('v')) return url.searchParams.get('v');
+            if (url.pathname.startsWith('/shorts/')) return url.pathname.split('/')[2];
+          } catch {}
+          const m = u.match(/(?:youtu\.be\/|v=|shorts\/)([A-Za-z0-9_-]{6,})/i);
+          return m ? m[1] : null;
+        }
+        function parseProvider(url){
+          try { new URL(url); } catch { return null; }
+          const ytId = getYouTubeId(url);
+          if (ytId) {
+            return {
+              kind:'youtube',
+              embedSrc:`https://www.youtube.com/embed/${ytId}`,
+              title:'', thumb:`https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
+            };
+          }
+          if (/soundcloud\.com\/.+/i.test(url)) {
+            return { kind:'soundcloud',
+              embedSrc:`https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=false&visual=true`,
+              title:'', thumb:''
+            };
+          }
+          if (/\.(mp3|ogg|wav)(\?.*)?$/i.test(url)) {
+            return { kind:'audio', src:url, title: url.split('/').pop() || 'Audio', thumb:'' };
+          }
+          return null;
+        }
+
+        // ---- oEmbed fetchers (best effort; falls back gracefully) ----
+        async function fetchYouTubeMeta(url, fallbackThumb){
+          try{
+            const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+            if (!res.ok) throw 0;
+            const json = await res.json();
+            return { title: json.title || '', thumb: json.thumbnail_url || fallbackThumb || '' };
+          } catch {
+            return { title:'', thumb: fallbackThumb || '' };
+          }
+        }
+        async function fetchSoundCloudMeta(url){
+          try{
+            const res = await fetch(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url)}`);
+            if (!res.ok) throw 0;
+            const json = await res.json();
+            return { title: json.title || 'SoundCloud Mix', thumb: json.thumbnail_url || '' };
+          } catch {
+            return { title:'SoundCloud Mix', thumb:'' };
+          }
+        }
+
+        function renderPlayer(mix){
+          $player.innerHTML = '';
+          if (!mix) { $player.innerHTML = '<span class="muted">No mix loaded yet</span>'; return; }
+          if (mix.kind === 'youtube' || mix.kind === 'soundcloud') {
+            const iframe = document.createElement('iframe');
+            iframe.src = mix.embedSrc;
+            iframe.width = '100%';
+            iframe.height = '100%';
+            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+            iframe.setAttribute('allowfullscreen','');
+            iframe.style.border = '0';
+            $player.appendChild(iframe);
+          } else {
+            const wrap = document.createElement('div');
+            wrap.style.padding = '16px';
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = mix.src;
+            audio.style.width = '100%';
+            wrap.appendChild(audio);
+            $player.appendChild(wrap);
+          }
+        }
+
+        function originName(u){
+          try{ return new URL(u).hostname.replace(/^www\./,''); } catch { return ''; }
+        }
+
+        function cardThumbSrc(m){
+          if (m.thumb) return m.thumb;
+          if (m.kind === 'audio') return '';
+          return ''; // could add a default image if you want
+        }
+
+        function renderList(mixes, activeId){
+          $list.innerHTML = '';
+          if (!mixes.length) {
+            $list.innerHTML = '<div class="muted">Nothing here yet—add a link above.</div>';
+            return;
+          }
+          mixes.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'mix-card' + (m.id === activeId ? ' active' : '');
+
+            const img = document.createElement('img');
+            img.className = 'mix-thumb';
+            const thumbSrc = cardThumbSrc(m);
+            if (thumbSrc) { img.src = thumbSrc; img.alt = m.title || 'thumbnail'; }
+            else {
+              // simple placeholder
+              img.alt = 'no thumbnail';
+              img.style.display = 'grid';
+              img.style.placeItems = 'center';
+              img.style.background = '#f3f3f3';
+              img.style.border = '1px dashed #ccc';
+              img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+                `<svg xmlns="http://www.w3.org/2000/svg" width="88" height="58">
+                   <rect width="100%" height="100%" fill="#f3f3f3"/>
+                   <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#999" font-size="12">audio</text>
+                 </svg>`
+              );
+            }
+
+            const info = document.createElement('div');
+            const title = document.createElement('div');
+            title.className = 'mix-title';
+            title.textContent = m.title && m.title.trim() ? m.title.trim() :
+              (m.kind === 'audio' ? (m.src.split('/').pop() || 'Audio') :
+               m.kind === 'soundcloud' ? 'SoundCloud Mix' : 'YouTube');
+            const sub = document.createElement('div');
+            sub.className = 'mix-sub';
+            sub.textContent = originName(m.url);
+
+            info.append(title, sub);
+
+            const actions = document.createElement('div');
+            actions.className = 'mix-actions';
+            const play = document.createElement('button');
+            play.textContent = 'Play';
+            play.addEventListener('click', () => {
+              renderPlayer(m);
+              renderList(mixes, m.id);
+              show('mixes');
+              const d = document.getElementById('mixes');
+              if (d && !d.open) d.open = true;
+            });
+            const del = document.createElement('button');
+            del.textContent = 'Delete';
+            del.addEventListener('click', () => {
+              const remain = mixes.filter(x => x.id !== m.id);
+              save(remain);
+              if (activeId === m.id) {
+                renderPlayer(remain[0]);
+                renderList(remain, remain[0]?.id || null);
+              } else {
+                renderList(remain, activeId);
+              }
+            });
+            actions.append(play, del);
+
+            // clicking the card also plays
+            card.addEventListener('click', (e) => {
+              if (e.target.tagName.toLowerCase() === 'button') return;
+              play.click();
+            });
+
+            card.append(img, info, actions);
+            $list.appendChild(card);
+          });
+        }
+
+        async function enrichMeta(mix){
+          // Only fetch if we don't already have a title/thumb.
+          if (mix.title && mix.thumb) return mix;
+          if (mix.kind === 'youtube') {
+            const meta = await fetchYouTubeMeta(mix.url, mix.thumb);
+            mix.title = mix.title || meta.title || '';
+            mix.thumb = mix.thumb || meta.thumb || mix.thumb;
+          } else if (mix.kind === 'soundcloud') {
+            const meta = await fetchSoundCloudMeta(mix.url);
+            mix.title = mix.title || meta.title || 'SoundCloud Mix';
+            mix.thumb = mix.thumb || meta.thumb || '';
+          }
+          return mix;
+        }
+
+        async function addMix(url){
+          const parsed = parseProvider(url);
+          if (!parsed) return null;
+          let mix = {
+            id: uid(),
+            url,
+            kind: parsed.kind,
+            title: parsed.title || '',
+            thumb: parsed.thumb || '',
+            embedSrc: parsed.embedSrc || '',
+            src: parsed.src || '',
+            addedAt: Date.now()
+          };
+          // optimistic save
+          const mixes = load();
+          mixes.unshift(mix);
+          save(mixes);
+          // async enrich (doesn't block UI)
+          try {
+            mix = await enrichMeta(mix);
+            const updated = load().map(m => m.id === mix.id ? mix : m);
+            save(updated);
+            renderList(updated, mix.id);
+          } catch {}
+          return mix;
+        }
+
+        // Add form (in nav)
+        $form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const url = ($url.value || '').trim();
+          const mix = await addMix(url);
+          if (!mix) { alert('Unsupported link. Try YouTube, SoundCloud, or a direct .mp3/.ogg/.wav.'); return; }
+          $url.value = '';
+          const mixes = load();
+          renderList(mixes, mix.id);
+          renderPlayer(mix);
+          show('mixes'); // ensure player is visible
+          const d = document.getElementById('mixes');
+          if (d && !d.open) d.open = true;
+        });
+
+        // init
+        const mixes = load();
+        renderList(mixes, null);
+
+        // When opening the mixes tab: if nothing is in the player, preload the newest.
+        document.getElementById('mixes')?.addEventListener('toggle', async () => {
+          const wrap = document.getElementById('mixes');
+          if (!wrap.open) return;
+          const hasMedia = !!document.querySelector('#mix-player iframe, #mix-player audio');
+          const current = load();
+          if (!hasMedia && current[0]) {
+            // lazy-enrich first if needed then play
+            const first = await enrichMeta(current[0]);
+            const updated = load().map(m => m.id === first.id ? first : m);
+            save(updated);
+            renderList(updated, first.id);
+            renderPlayer(first);
+          }
+        });
+      })();
+
+      // ======================
+      // VIEW CONTROLLER (stage)
+      // ======================
+      const $viewClock = document.getElementById('view-clock');
+      const $viewList  = document.getElementById('view-list');
+      const $viewMsgs  = document.getElementById('view-msgs');
+      const $viewMixes = document.getElementById('view-mixes');
+
+      const $formDetails  = document.getElementById('form');
+      const $msgsDetails  = document.getElementById('msgs');
+      const $mixesDetails = document.getElementById('mixes');
+      const allDetails = [$formDetails, $msgsDetails, $mixesDetails].filter(Boolean);
+
+      function show(view){
+        $viewClock.hidden = view !== 'clock';
+        $viewList.hidden  = view !== 'list';
+        $viewMsgs.hidden  = view !== 'msgs';
+        $viewMixes.hidden = view !== 'mixes';
+      }
+
+      // First load: ALWAYS start on Clock
+      show('clock');
+
+      // Only allow one section open at once (accordion feel)
+      function closeOthers(openOne){
+        allDetails.forEach(d => { if (d && d !== openOne) d.open = false; });
+      }
+
+      // Wire details → views
+      $formDetails?.addEventListener('toggle', () => {
+        if ($formDetails.open) { closeOthers($formDetails); show('list'); }
+        else if (![ $msgsDetails, $mixesDetails ].some(d => d?.open)) show('clock');
+      });
+
+      $msgsDetails?.addEventListener('toggle', () => {
+        if ($msgsDetails.open) { closeOthers($msgsDetails); show('msgs'); }
+        else if (![ $formDetails, $mixesDetails ].some(d => d?.open)) show('clock');
+      });
+
+      $mixesDetails?.addEventListener('toggle', () => {
+        if ($mixesDetails.open) { closeOthers($mixesDetails); show('mixes'); }
+        else if (![ $formDetails, $msgsDetails ].some(d => d?.open)) show('clock');
+      });
+    </script>
+  </div>
+</body>
+</html>
