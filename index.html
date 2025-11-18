@@ -5,7 +5,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Tracklist – Stage + Mixes (thumbs + titles)</title>
 <style>
-  * { padding:0; margin:0; box-sizing:border-box; font-family:"HelveticaNeue-Light"; }
+  * { padding:0; margin:0; box-sizing:border-box; font-family:"Microgramma",  "HelveticaNeue-Light"; }
+
+@font-face {
+  font-family: "Microgramma";
+  src: url('Microgramma D Extended Bold.otf') format('opentype');
+}
+
+  /* stage & panels */
+  #stage { min-height:320px; 
+  /*background-image: url(https://66.media.tumblr.com/6c4d864d6d43064fe2bee8bc5db6cba7/tumblr_pwldqp0qyB1ypo8pvo1_400.gif);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;*/
+  }
+  .panel[hidden] { display:none !important;
+  }
 
   .listcontainer { margin:20px; border:1px solid black; height: 212px; overflow: scroll; }
   .divider { height:25px; border:1px solid black; background:blue; }
@@ -35,13 +50,13 @@
   .delete-btn { margin:12px; }
 
   /* stage & panels */
-  #stage { min-height:320px; }
+  /* #stage { min-height:320px; }
   .panel[hidden] { display:none !important;
-  }
+  } */
 
   /* generic content */
   .pad { padding:16px; }
-  .clock { padding:16px; font-size:77px; text-align:center; }
+  .clock { padding:16px; font-size:77px; text-align:center; /*color: rgb(255, 242, 225)*/ }
   .muted { opacity:.7; font-size:.9rem; }
 
   /* mixes UI (in blue nav area) */
